@@ -18,10 +18,10 @@ $MailChimp = new MailChimp($mailchimp_key);
 
 
 // Caching to speed up process
-if ( file_exists('cache/categories.json') && filemtime('cache/categories.json') >= strtotime("5 minutes ago") ){ }else {
+if ( file_exists('cache/categories.json') && filemtime('cache/categories.json') >= strtotime("30 minutes ago") ){ }else {
   file_put_contents('cache/categories.json', json_encode($MailChimp->get("lists/$mailchimp_list/interest-categories")));
 }
-if ( file_exists('cache/segments.json') && filemtime('cache/segments.json') >= strtotime("5 minutes ago") ){ }else {
+if ( file_exists('cache/segments.json') && filemtime('cache/segments.json') >= strtotime("30 minutes ago") ){ }else {
   file_put_contents('cache/segments.json', json_encode($MailChimp->get("lists/$mailchimp_list/segments?count=100")));
 }
 
@@ -30,7 +30,7 @@ if ( file_exists('cache/segments.json') && filemtime('cache/segments.json') >= s
 $list_groups = array();
 $categories = json_decode(file_get_contents('cache/categories.json'), true);
 foreach ($categories["categories"] as $category){
-  if ( file_exists('cache/group-'.$category["id"].'.json') && filemtime('cache/group-'.$category["id"].'.json') >= strtotime("5 minutes ago") ){ }else {
+  if ( file_exists('cache/group-'.$category["id"].'.json') && filemtime('cache/group-'.$category["id"].'.json') >= strtotime("30 minutes ago") ){ }else {
     file_put_contents('cache/group-'.$category["id"].'.json', json_encode($MailChimp->get("lists/$mailchimp_list/interest-categories/".$category["id"]."/interests?count=100")));
   }
   $groups = json_decode(file_get_contents('cache/group-'.$category["id"].'.json'),true);
@@ -75,7 +75,19 @@ foreach ($subscriptions["interests"] as $interest_id=>$interest_value){
 </body>
 <script>
 $( ".group" ).bind( "click", function() {
-  alert( $(this).val() );
+      if ($(this).is(':checked')) {
+        endpoint = "subscribe.php";
+      } else {
+        endpoint = "unsubscribe.php";
+      }
+	    $.ajax({
+	       type: "GET",
+	       url: "./ajax/"+endpoint,
+         data:{ hash : "<?=$subscriber_hash?>", group : $(this).val()},
+	       success: function(msg){
+	         //alert( "Updated" );
+	       }
+	     });
 });
 </script>
 </html>
