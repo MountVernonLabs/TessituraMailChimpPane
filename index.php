@@ -16,6 +16,9 @@ include("src/MailChimp.php");
 use \DrewM\MailChimp\MailChimp;
 $MailChimp = new MailChimp($mailchimp_key);
 
+// Lookup requested user's profile
+$subscriber_hash = $MailChimp->subscriberHash($_GET["email"]);
+$subscriptions = $MailChimp->get("lists/$mailchimp_list/members/$subscriber_hash");
 
 // Caching to speed up process
 if ( file_exists('cache/categories.json') && filemtime('cache/categories.json') >= strtotime("30 minutes ago") ){ }else {
@@ -47,11 +50,6 @@ foreach ($segments["segments"] as $segment){
   }
 }
 
-// Lookup requested user's profile
-$subscriber_hash = $MailChimp->subscriberHash('mkbriney@gmail.com');
-$subscriptions = $MailChimp->get("lists/$mailchimp_list/members/$subscriber_hash");
-
-//print_r($subscriptions);
 
 ?>
 <h3>Group Subscriptions</h3>
@@ -69,7 +67,7 @@ foreach ($subscriptions["interests"] as $interest_id=>$interest_value){
 <label>
   <input type="checkbox" class="group" value="<?=$interest_id?>" tabindex="1" <?=$checked?>><?=substr($lists_groups[$interest_id],0,45)?>
 </label>
-<?php }?>
+<?php } ?>
     </div>
 
 </body>
