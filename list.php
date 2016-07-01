@@ -8,6 +8,7 @@ $MailChimp = new MailChimp($mailchimp_key);
 $result = $MailChimp->get('lists/'.$mailchimp_list.'/members');
 
 foreach ($result["members"] as $member){
+  echo $member["email_address"]."\n";
   print_r($member["merge_fields"]);
 }
 

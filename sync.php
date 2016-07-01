@@ -29,30 +29,78 @@ foreach ($list as $record){
   ));
   curl_setopt($get_person, CURLOPT_HTTPHEADER, $headers);
   $person = json_decode(curl_exec($get_person),true);
+
+  // Get last transactional information
+  $get_financial = curl_init();
+  curl_setopt_array($get_financial, array(
+      CURLOPT_RETURNTRANSFER => 1,
+      CURLOPT_URL => 'https://'.$tessitura_ramp.'.tessituranetworkramp.com/LiveAPI/TessituraService/CRM/Constituents/'.$record["ConstituentId"].'/DevelopmentInfo',
+      CURLOPT_USERAGENT => 'MailChimp Sync'
+  ));
+  curl_setopt($get_financial, CURLOPT_HTTPHEADER, $headers);
+  $financial = json_decode(curl_exec($get_financial),true);
+
   // Loop through all of the email addresses and then subscribe them to your MailChimp list
   foreach ($person["ElectronicAddresses"] as $email){
-    echo "Subscribing...".$person["FirstName"]." ".$person["LastName"]." ".$email["Address"]."...";
+
     $MailChimp = new MailChimp($mailchimp_key);
 
-    // First we write the contact with just email (in case they are not already in the system)
-    $result = $MailChimp->post("lists/$mailchimp_list/members", [
-                    'email_address' => $email["Address"],
-                    'status'        => 'subscribed',
-                ]);
-    // Then we need to update the record to overwrite any new field changes
-    $subscriber_hash = $MailChimp->subscriberHash($email["Address"]);
-    $result = $MailChimp->patch("lists/$mailchimp_list/members/$subscriber_hash", [
-                    'merge_fields' => ['CID'=>$record["ConstituentId"], 'FNAME'=>$person["FirstName"], 'LNAME'=>$person["LastName"], 'ZIPCODE'=>$person["Addresses"][0]["PostalCode"], 'STATE'=>$person["Addresses"][0]["State"]["StateCode"], 'LETTER_SAL'=>$person["Salutations"][0]["LetterSalutation"], 'ENV_SAL'=>$person["Salutations"][0]["EnvelopeSalutation1"], 'PHONE'=>$person["PhoneNumbers"][0]["PhoneFormatted"] ],
-                ]);
-    // Add to segment if passed in
-    if (isset($argv[2])){
-      $result = $MailChimp->post("lists/$mailchimp_list/segments/".$argv[2]."/members", [ // Testing with 513
-                      'id' => $subscriber_hash,
+    if (strpos($email["Address"], 'mountvernonmember.org') === false) {
+      echo "Subscribing...".$person["FirstName"]." ".$person["LastName"]." ".$email["Address"]."...";
+      // First we write the contact with just email (in case they are not already in the system)
+      $result = $MailChimp->post("lists/$mailchimp_list/members", [
                       'email_address' => $email["Address"],
-                      'status'        => 'subscribed'
+                      'status'        => 'subscribed',
                   ]);
+      // Then we need to update the record to overwrite any new field changes
+      $subscriber_hash = $MailChimp->subscriberHash($email["Address"]);
+
+      $merge_fields = "";
+      if (isset($record["ConstituentId"])){
+        $merge_fields = $merge_fields.'"CID"=>$record["ConstituentId"],';
+      }
+      if (isset($person["FirstName"])){
+        $merge_fields = $merge_fields.'"FNAME"=>$person["FirstName"],';
+      }
+      if (isset($person["LastName"])){
+        $merge_fields = $merge_fields.'"LNAME"=>$person["LastName"],';
+      }
+      if (isset($person["Addresses"][0]["PostalCode"])){
+        $merge_fields = $merge_fields.'"ZIPCODE"=>$person["Addresses"][0]["PostalCode"],';
+      }
+      if (isset($person["Addresses"][0]["State"]["StateCode"])){
+        $merge_fields = $merge_fields.'"STATE"=>$person["Addresses"][0]["State"]["StateCode"],';
+      }
+      if (isset($person["Salutations"][0]["LetterSalutation"])){
+        $merge_fields = $merge_fields.'"LETTER_SAL"=>$person["Salutations"][0]["LetterSalutation"],';
+      }
+      if (isset($person["Salutations"][0]["EnvelopeSalutation1"])){
+        $merge_fields = $merge_fields.'"ENV_SAL"=>$person["Salutations"][0]["EnvelopeSalutation1"],';
+      }
+      if (isset($person["PhoneNumbers"][0]["PhoneFormatted"])){
+        $merge_fields = $merge_fields.'"PHONE"=>$person["PhoneNumbers"][0]["PhoneFormatted"],';
+      }
+      if (isset($financial["MembershipLevel"])){
+        $merge_fields = $merge_fields.'"MEMB_LEVEL"=>$financial["MembershipLevel"],';
+      }
+      if (isset($financial["MembershipExpiration"])){
+        $merge_fields = $merge_fields.'"MEMB_EXPR"=>$financial["MembershipExpiration"],';
+      }
+
+      $result = $MailChimp->patch("lists/$mailchimp_list/members/$subscriber_hash", [
+                      'merge_fields' => [rtrim($merge_fields, ',')],
+                  ]);
+      // Add to segment if passed in
+      if (isset($argv[2])){
+        $result = $MailChimp->post("lists/$mailchimp_list/segments/".$argv[2]."/members", [ // Testing with 513
+                        'id' => $subscriber_hash,
+                        'email_address' => $email["Address"],
+                        'status'        => 'subscribed'
+                    ]);
+      }
+      echo "done!\n";
     }
-    echo "done!\n";
+
   }
 
 
