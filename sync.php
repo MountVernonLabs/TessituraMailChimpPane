@@ -40,6 +40,23 @@ foreach ($list as $record){
   curl_setopt($get_financial, CURLOPT_HTTPHEADER, $headers);
   $financial = json_decode(curl_exec($get_financial),true);
 
+  // Get last order (mansion tour)
+  $get_orders = curl_init();
+  curl_setopt_array($get_orders, array(
+      CURLOPT_RETURNTRANSFER => 1,
+      CURLOPT_URL => 'https://'.$tessitura_ramp.'.tessituranetworkramp.com/LiveAPI/TessituraService/Custom/tickets?customer_no='.$record["ConstituentId"],
+      CURLOPT_USERAGENT => 'MailChimp Sync'
+  ));
+  curl_setopt($get_orders, CURLOPT_HTTPHEADER, $headers);
+  $orders = new SimpleXMLElement(curl_exec($get_orders));
+
+  foreach ($orders->ticket as $ticket){
+    //print_r($ticket);
+    if ($ticket->perf_name == "Mansion Tour"){
+      $last_visit = $ticket->perf_dt;
+    }
+  }
+
   // Loop through all of the email addresses and then subscribe them to your MailChimp list
   foreach ($person["ElectronicAddresses"] as $email){
 
@@ -55,40 +72,45 @@ foreach ($list as $record){
       // Then we need to update the record to overwrite any new field changes
       $subscriber_hash = $MailChimp->subscriberHash($email["Address"]);
 
-      $merge_fields = "";
+      $merge_fields = new stdClass;
       if (isset($record["ConstituentId"])){
-        $merge_fields = $merge_fields.'"CID"=>$record["ConstituentId"],';
-      }
-      if (isset($person["FirstName"])){
-        $merge_fields = $merge_fields.'"FNAME"=>$person["FirstName"],';
-      }
-      if (isset($person["LastName"])){
-        $merge_fields = $merge_fields.'"LNAME"=>$person["LastName"],';
+        $merge_fields->CID = $record["ConstituentId"];
       }
       if (isset($person["Addresses"][0]["PostalCode"])){
-        $merge_fields = $merge_fields.'"ZIPCODE"=>$person["Addresses"][0]["PostalCode"],';
+        $merge_fields->ZIPCODE = $person["Addresses"][0]["PostalCode"];
       }
-      if (isset($person["Addresses"][0]["State"]["StateCode"])){
-        $merge_fields = $merge_fields.'"STATE"=>$person["Addresses"][0]["State"]["StateCode"],';
+      if (isset($person["FirstName"])){
+        $merge_fields->FNAME = $person["FirstName"];
+      }
+      if (isset($person["LastName"])){
+        $merge_fields->LNAME = $person["LastName"];
       }
       if (isset($person["Salutations"][0]["LetterSalutation"])){
-        $merge_fields = $merge_fields.'"LETTER_SAL"=>$person["Salutations"][0]["LetterSalutation"],';
+        $merge_fields->LETTER_SAL = $person["Salutations"][0]["LetterSalutation"];
       }
       if (isset($person["Salutations"][0]["EnvelopeSalutation1"])){
-        $merge_fields = $merge_fields.'"ENV_SAL"=>$person["Salutations"][0]["EnvelopeSalutation1"],';
+        $merge_fields->ENV_SAL = $person["Salutations"][0]["EnvelopeSalutation1"];
       }
       if (isset($person["PhoneNumbers"][0]["PhoneFormatted"])){
-        $merge_fields = $merge_fields.'"PHONE"=>$person["PhoneNumbers"][0]["PhoneFormatted"],';
+        $merge_fields->PHONE = $person["PhoneNumbers"][0]["PhoneFormatted"];
       }
       if (isset($financial["MembershipLevel"])){
-        $merge_fields = $merge_fields.'"MEMB_LEVEL"=>$financial["MembershipLevel"],';
+        $merge_fields->MEMB_LEVEL = $financial["MembershipLevel"];
       }
       if (isset($financial["MembershipExpiration"])){
-        $merge_fields = $merge_fields.'"MEMB_EXPR"=>$financial["MembershipExpiration"],';
+        $merge_fields->MEMB_EXPR = date("Y-m-d",strtotime($financial["MembershipExpiration"]));
       }
+      if (isset($last_visit)){
+        $merge_fields->NEXT_PERF = date("Y-m-d",strtotime($last_visit));
+      }
+      // Removing state because it needs to be re-formatted in MailChimp
+      //if (isset($person["Addresses"][0]["State"]["StateCode"])){
+      //  $merge_fields->STATE = $person["Addresses"][0]["State"]["StateCode"];
+      //}
 
+      print_r($merge_fields);
       $result = $MailChimp->patch("lists/$mailchimp_list/members/$subscriber_hash", [
-                      'merge_fields' => [rtrim($merge_fields, ',')],
+                      'merge_fields' => $merge_fields,
                   ]);
       // Add to segment if passed in
       if (isset($argv[2])){
