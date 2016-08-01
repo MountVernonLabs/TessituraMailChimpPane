@@ -49,7 +49,7 @@ foreach ($list as $record){
   ));
   curl_setopt($get_orders, CURLOPT_HTTPHEADER, $headers);
   $orders = new SimpleXMLElement(curl_exec($get_orders));
-
+  unset($last_visit);
   foreach ($orders->ticket as $ticket){
     //print_r($ticket);
     if ($ticket->perf_name == "Mansion Tour"){
